@@ -17,8 +17,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 });
 
 //builder.Services.AddScoped<RiskDashboardService>();
-builder.Services.AddScoped<IRiskDashboardService , RiskDashboardService>();
-
+builder.Services.AddScoped<IRiskDashboardService, RiskDashboardService>();
 var app = builder.Build();
 
 app.UseSwagger();

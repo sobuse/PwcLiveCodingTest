@@ -5,20 +5,25 @@ using RiskDashboard.LiveCoding.Services;
 namespace RiskDashboard.LiveCoding.Controllers;
 
 [ApiController]
-[Route("api/risk-dashboard")]
+[Route("api/[controller]")]
 public class RiskDashboardController : ControllerBase
 {
-    private readonly RiskDashboardService _service;
+    private readonly IRiskDashboardService _service;
 
-    public RiskDashboardController(RiskDashboardService service)
+    public RiskDashboardController(
+        IRiskDashboardService service)
     {
         _service = service;
     }
 
     [HttpGet("summary")]
-    public IActionResult GetSummary([FromQuery] RiskDashboardRequest request)
+    public async Task<ActionResult<List<RiskDashboardDto>>> GetSummary(
+        [FromQuery] RiskDashboardRequest request,
+        CancellationToken cancellationToken)
     {
-        var result = _service.GetDashboardSummary(request).Result;
+        var result = await _service.GetDashboardSummaryAsync(
+            request,
+            cancellationToken);
 
         return Ok(result);
     }
