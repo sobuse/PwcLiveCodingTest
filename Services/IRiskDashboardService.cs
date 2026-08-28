@@ -6,10 +6,9 @@ using
 
 using RiskDashboard.LiveCoding.Models;
 
-namespace RiskDashboard.LiveCoding.Interfaces
+public interface IRiskDashboardService
 {
-    public class IRiskDashboardService 
-    {
-        Task<List<RiskDashboardDto>> GetDashboardSummaryAsync(RiskDashboardRequest request, CancellationToken cancellationToken = default);
-    }
+    Task<List<RiskDashboardDto>> GetDashboardSummaryAsync(
+        RiskDashboardRequest request,
+        CancellationToken cancellationToken = default);
 }
