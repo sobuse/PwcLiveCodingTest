@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using RiskDashboard.LiveCoding.Data;
+using RiskDashboard.LiveCoding.Interfaces;
 using RiskDashboard.LiveCoding.Models;
 using RiskDashboard.LiveCoding.Services;
 
@@ -15,7 +16,8 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseInMemoryDatabase("RiskDashboardLiveCodingDb");
 });
 
-builder.Services.AddScoped<RiskDashboardService>();
+//builder.Services.AddScoped<RiskDashboardService>();
+builder.Services.AddScoped<IRiskDashboardService , RiskDashboardService>();
 
 var app = builder.Build();
 

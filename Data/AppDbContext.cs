@@ -14,4 +14,5 @@ public class AppDbContext : DbContext
     public DbSet<RiskControl> Controls { get; set; }
     public DbSet<RiskAssessment> RiskAssessments { get; set; }
     public DbSet<RiskDashboardRequest> RiskDashboardRequests{get; set;}
+    
 }

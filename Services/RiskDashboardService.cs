@@ -22,7 +22,7 @@ public class RiskDashboardService
         _logger = logger;
     }
 
-    public async Task<List<RiskDashboardDto>> GetDashboardSummary(
+    public async Task<List<RiskDashboardDto>> GetDashboardSummaryAsync(
         RiskDashboardRequest request)
     {
         var cacheKey = "risk-dashboard-summary";
