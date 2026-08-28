@@ -22,93 +22,95 @@ public class RiskDashboardService
         _logger = logger;
     }
 
-    public async Task<List<RiskDashboardDto>> GetDashboardSummaryAsync(
-        RiskDashboardRequest request)
-    {
-        var cacheKey = "risk-dashboard-summary";
+    public class RiskDashboardService : IRiskDashboardService
+{
+    private readonly AppDbContext _db;
+    private readonly IDistributedCache _cache;
+    private readonly ILogger<RiskDashboardService> _logger;
 
-        var cached = await _cache.GetStringAsync(cacheKey);
+    public RiskDashboardService(
+        AppDbContext db,
+        IDistributedCache cache,
+        ILogger<RiskDashboardService> logger)
+    {
+        _db = db;
+        _cache = cache;
+        _logger = logger;
+    }
+
+    public async Task<List<RiskDashboardDto>> GetDashboardSummaryAsync(
+        RiskDashboardRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var cacheKey = BuildCacheKey(request);
+
+        var cached = await _cache.GetStringAsync(
+            cacheKey,
+            cancellationToken);
 
         if (!string.IsNullOrWhiteSpace(cached))
         {
-            return JsonSerializer.Deserialize<List<RiskDashboardDto>>(cached);
+            _logger.LogInformation(
+                "Returning risk dashboard from cache. TenantId: {TenantId}",
+                request.TenantId);
+
+            return JsonSerializer.Deserialize<List<RiskDashboardDto>>(cached)
+                   ?? new List<RiskDashboardDto>();
         }
 
-        var risks = _db.Risks
-            .Include(x => x.Controls)
-            .Include(x => x.Assessments)
-            .Where(x => x.TenantId == request.TenantId)
-            .ToList();
+        var query = _db.Risks
+            .AsNoTracking()
+            .Where(r => r.TenantId == request.TenantId);
 
         if (request.BusinessUnitId.HasValue)
         {
-            risks = risks
-                .Where(x => x.BusinessUnitId == request.BusinessUnitId.Value)
-                .ToList();
+            query = query.Where(r =>
+                r.BusinessUnitId == request.BusinessUnitId.Value);
         }
 
-        if (!string.IsNullOrWhiteSpace(request.SearchText))
-        {
-            risks = risks
-                .Where(x => x.Title.ToLower().Contains(request.SearchText.ToLower()))
-                .ToList();
-        }
-
-        if (request.FromDate.HasValue)
-        {
-            risks = risks
-                .Where(x => x.CreatedDate >= request.FromDate.Value)
-                .ToList();
-        }
-
-        if (request.ToDate.HasValue)
-        {
-            risks = risks
-                .Where(x => x.CreatedDate <= request.ToDate.Value)
-                .ToList();
-        }
-
-        var result = new List<RiskDashboardDto>();
-
-        foreach (var risk in risks)
-        {
-            var controlCount = _db.Controls
-                .Where(x => x.RiskId == risk.Id)
-                .Count();
-
-            var latestAssessment = _db.RiskAssessments
-                .Where(x => x.RiskId == risk.Id)
-                .OrderByDescending(x => x.AssessmentDate)
-                .FirstOrDefault();
-
-            var averageScore = _db.RiskAssessments
-                .Where(x => x.RiskId == risk.Id)
-                .Average(x => x.Score);
-
-            result.Add(new RiskDashboardDto
+        var result = await query
+            .Select(r => new RiskDashboardDto
             {
-                RiskId = risk.Id,
-                RiskTitle = risk.Title,
-                BusinessUnitId = risk.BusinessUnitId,
-                ControlCount = controlCount,
-                LatestAssessmentDate = latestAssessment.AssessmentDate,
-                AverageAssessmentScore = averageScore,
-                RiskRating = averageScore >= 75
-                    ? "High"
-                    : averageScore >= 40
-                        ? "Medium"
-                        : "Low"
-            });
-        }
+                Id = r.Id,
+                Name = r.Name,
+                RiskLevel = r.RiskLevel,
+                Status = r.Status,
+
+                ControlsCount = r.Controls.Count(),
+                AssessmentsCount = r.Assessments.Count()
+            })
+            .ToListAsync(cancellationToken);
+
+        await CacheResultAsync(
+            cacheKey,
+            result,
+            cancellationToken);
+
+        return result;
+    }
+
+    private static string BuildCacheKey(RiskDashboardRequest request)
+    {
+        return request.BusinessUnitId.HasValue
+            ? $"risk-dashboard:{request.TenantId}:{request.BusinessUnitId}"
+            : $"risk-dashboard:{request.TenantId}";
+    }
+
+    private async Task CacheResultAsync(
+        string cacheKey,
+        List<RiskDashboardDto> result,
+        CancellationToken cancellationToken)
+    {
+        var json = JsonSerializer.Serialize(result);
 
         await _cache.SetStringAsync(
             cacheKey,
-            JsonSerializer.Serialize(result),
+            json,
             new DistributedCacheEntryOptions
             {
-                AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(1)
-            });
-
-        return result;
+                AbsoluteExpirationRelativeToNow =
+                    TimeSpan.FromMinutes(5)
+            },
+            cancellationToken);
     }
 }
